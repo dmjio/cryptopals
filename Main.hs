@@ -10,7 +10,6 @@ import qualified Data.ByteString         as B
 import           Data.Bits
 import           Data.Function
 import qualified Data.ByteString.Char8   as BC
-import qualified Data.ByteString.Lazy    as L
 import           Data.Word
 import           Control.Monad
 import           Data.Bits
@@ -89,19 +88,13 @@ kk =
 
 -- | 1.3
 -- 1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736
-v = ("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736" :: Msg 16)
-
-decodeHex :: Msg 16 -> B.ByteString
-decodeHex (Msg bs) = B.pack $ go (B.unpack bs)
-  where
-    go [] = []
-    go (x:y:xs) = fromIntegral (toDecimal chunk) : go xs
-      where
-        chunk :: Msg 16
-        chunk = Msg $ B.pack [x,y]
-
 -- | 1.3
-result = B.map (`xor` 88) (decodeHex v)
+result :: BC.ByteString
+result = B.map (`xor` 88) $ getMsg (convert v :: Msg 256)
+  where
+    v :: Msg 16
+    v = ("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736" :: Msg 16)
+
 -- "Cooking MC's like a pound of bacon"
 
 -- | 1.4
@@ -111,19 +104,19 @@ findText :: IO ()
 findText = do
   lines <- BC.lines <$> B.readFile "4.txt"
   mapM_ print $ take 10 $ sortBy (flip compare `on` fst)
-    [ (s, (lineNumber, n, B.map (`xor` n) hex))
+    [ (s, (lineNumber, n, B.map (`xor` n) $ getMsg hex))
     | (lineNumber, line) <- zip [1..] lines
     , n <- [ 0..255 ]
-    , let hex = decodeHex (Msg line :: Msg 16)
-    , let s = score $ B.unpack $ B.map (`xor` n) hex
+    , let hex = convert (Msg line :: Msg 16) :: Msg 256
+    , let s = score $ B.unpack $ B.map (`xor` n) (getMsg hex)
     ]
-
-score :: [Word8] -> Integer
-score [] = 0
-score (x:xs) =
-  case lookup x freqMap of
-    Nothing -> 0 + score xs
-    Just z -> fromIntegral z + score xs
+    where
+      score :: [Word8] -> Integer
+      score [] = 0
+      score (x:xs) =
+        case lookup x freqMap of
+          Nothing -> 0 + score xs
+          Just z -> fromIntegral z + score xs
 
 -- | English freq map
 -- https://www.math.cornell.edu/~mec/2003-2004/cryptography/subs/frequency.jpg
