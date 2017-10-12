@@ -17,6 +17,7 @@ import           Debug.Trace             (traceShow)
 import qualified Data.ByteString.Builder as Builder
 import           Data.Char
 import           Data.List
+import           Data.List.Split
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Proxy
@@ -29,11 +30,11 @@ newtype Alphabet (base :: Nat) = Alphabet B.ByteString
 newtype Msg (base :: Nat) = Msg { getMsg :: B.ByteString }
   deriving (Show, Eq, IsString)
 
-alphabet64 :: Alphabet 64
-alphabet64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
 alphabet16 :: Alphabet 16
 alphabet16 = "0123456789abcdef"
+
+alphabet64 :: Alphabet 64
+alphabet64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 ascii :: Alphabet 256
 ascii = Alphabet $ B.pack [0..255]
@@ -143,7 +144,7 @@ result15 = convert (repeatXor "ICE" k) :: Msg 16
    k = "Burning 'em, if you ain't quick and nimble I go crazy when I hear a cymbal"
 
 -- | 1.6
-keysize :: [Integer]
+keysize :: [Int]
 keysize = [2..40]
 
 testHamming :: Int
@@ -153,3 +154,19 @@ hamming :: B.ByteString -> B.ByteString -> Int
 hamming xs ys = sum
   $ map popCount
   $ zipWith xor (B.unpack xs) (B.unpack ys)
+
+t = do
+  line <- BC.concat . BC.lines <$> B.readFile "6.txt"
+  print line
+  let s = convert (Msg line :: Msg 64) :: Msg 256
+  print s
+  mapM_ print $ sortBy (flip compare `on` snd) [ (k, normalized)
+              | k <- [2..60]
+              , let m = getMsg s
+              , let firstKeys = take k (B.unpack m)
+              , let secondKeys = take k $ drop k (B.unpack m)
+              , let ham = hamming (B.pack firstKeys) (B.pack secondKeys)
+              , let normalized = fromIntegral ham / fromIntegral k
+              ]
+  let z = transpose $ chunksOf 5 $ B.unpack (getMsg s)
+  print z
